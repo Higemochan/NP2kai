@@ -119,7 +119,7 @@ BRESULT scrnmng_create(UINT8 mode) {
 	} else {
 		s_window = SDL_CreateWindow(app_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, scrnmng.width, scrnmng.height, 0);
 	}
-	s_renderer = SDL_CreateRenderer(s_window, -1, 0);
+	s_renderer = SDL_CreateRenderer(s_window, -1, SDL_RENDERER_PRESENTVSYNC);
 #else
 	s1_videoinfo = SDL_GetVideoInfo();
 	scrnmng.dispsurf = SDL_SetVideoMode(scrnmng.width, scrnmng.height, scrnmng.bpp, SDL_HWSURFACE);
@@ -129,11 +129,7 @@ BRESULT scrnmng_create(UINT8 mode) {
 #if defined(__OPENDINGUX__) && !defined(OPENDINGUX_VGA)
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "2");
 #endif
-	if(mode & SCRNMODE_ROTATEMASK) {
-		SDL_RenderSetLogicalSize(s_renderer, scrnmng.height, scrnmng.width);
-	} else {
-		SDL_RenderSetLogicalSize(s_renderer, scrnmng.width, scrnmng.height);
-	}
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 	switch(scrnmng.bpp) {
 	case 16:
 		if(mode & SCRNMODE_ROTATEMASK) {
@@ -567,9 +563,22 @@ scrnmng_update(void)
 	} else {
 		SDL_UpdateTexture(s_texture, NULL, scrnmng.dispsurf->pixels, scrnmng.dispsurf->pitch);
 	}
-	SDL_RenderClear(s_renderer);
-	SDL_RenderCopy(s_renderer, s_texture, NULL, NULL);
-	SDL_RenderPresent(s_renderer);
+	{
+		int ww, wh, tw, th, scale, sx, sy;
+		SDL_QueryTexture(s_texture, NULL, NULL, &tw, &th);
+		SDL_GetRendererOutputSize(s_renderer, &ww, &wh);
+		scale = ww / tw;
+		if (wh / th < scale) scale = wh / th;
+		if (scale < 1) scale = 1;
+		SDL_Rect dst;
+		dst.w = tw * scale;
+		dst.h = th * scale;
+		dst.x = (ww - dst.w) / 2;
+		dst.y = (wh - dst.h) / 2;
+		SDL_RenderClear(s_renderer);
+		SDL_RenderCopy(s_renderer, s_texture, NULL, &dst);
+		SDL_RenderPresent(s_renderer);
+	}
 #else
 	SDL_UpdateRect(scrnmng.dispsurf, 0, 0, 0, 0);
 #endif
