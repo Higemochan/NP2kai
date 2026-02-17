@@ -1059,15 +1059,25 @@ BRESULT sysmenu_menuopen(UINT menutype, int x, int y) {
 	menusys_setcheck(MID_PC9801_26_86, (b == 0x06));
 	menusys_setcheck(MID_PC9801_86_CB, (b == 0x14));
 	menusys_setcheck(MID_PC9801_118, (b == 0x08));
+	menusys_setcheck(MID_PC9801_86_MX, (b == 0x64));
+	menusys_setcheck(MID_PC9801_86_118, (b == 0x68));
+	menusys_setcheck(MID_PC9801_MX, (b == 0x60));
 	menusys_setcheck(MID_SPEAKBOARD, (b == 0x20));
 	menusys_setcheck(MID_SPEAKBOARD86, (b == 0x24));
 	menusys_setcheck(MID_SPARKBOARD, (b == 0x40));
 	menusys_setcheck(MID_SOUNDORCHESTRA, (b == 0x32));
 	menusys_setcheck(MID_SOUNDORCHESTRAV, (b == 0x82));
+	menusys_setcheck(MID_LITTLEORCHESTRAL, (b == 0x22));
+	menusys_setcheck(MID_MMORCHESTRA, (b == 0x26));
 	menusys_setcheck(MID_AMD98, (b == 0x80));
 	menusys_setcheck(MID_WAVESTAR, (b == 0x70));
 #if defined(SUPPORT_SOUND_SB16)
 	menusys_setcheck(MID_SB16, (b == 0x41));
+	menusys_setcheck(MID_86_SB16, (b == 0x44));
+	menusys_setcheck(MID_MX_SB16, (b == 0x43));
+	menusys_setcheck(MID_118_SB16, (b == 0x45));
+	menusys_setcheck(MID_86MXSB16, (b == 0x42));
+	menusys_setcheck(MID_86118SB16, (b == 0x46));
 #endif	/* SUPPORT_SOUND_SB16 */
 #if defined(SUPPORT_PX)
 	menusys_setcheck(MID_PX1, (b == 0x30));
