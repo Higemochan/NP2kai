@@ -2,6 +2,7 @@
 #include	<common/strres.h>
 #include	<dosio.h>
 #include	<soundmng.h>
+#include	<sysmng.h>
 #include	<pccore.h>
 #include	<fdd/diskdrv.h>
 #include	<diskimage/fddfile.h>
@@ -9,6 +10,11 @@
 #include	<embed/vramhdl.h>
 #include	<embed/menubase/menubase.h>
 #include	"menustr.h"
+
+#if !defined(__LIBRETRO__)
+extern char fddfolder[MAX_PATH];
+extern char hddfolder[MAX_PATH];
+#endif
 
 #ifdef SUPPORT_NVL_IMAGES
 BOOL nvl_check();
@@ -478,15 +484,24 @@ static const FSELPRM scsiprm = {hddtitle, diskfilter, scsiext};
 void filesel_fdd(REG8 drv) {
 
 	OEMCHAR	path[MAX_PATH];
+	const OEMCHAR *defpath;
 
 	if (drv < 4) {
-#if defined(__LIBRETRO__) || defined(EMSCRIPTEN)
-		if (selectfile(&fddprm, path, NELEMENTS(path), fdd_diskname(drv),drv)) {
-#else
-		if (selectfile(&fddprm, path, NELEMENTS(path), fdd_diskname(drv))) {
-#endif
+		defpath = fdd_diskname(drv);
+#if !defined(__LIBRETRO__) && !defined(EMSCRIPTEN)
+		if ((!defpath || !defpath[0]) && fddfolder[0]) {
+			defpath = fddfolder;
+		}
+		if (selectfile(&fddprm, path, NELEMENTS(path), defpath)) {
+			file_cpyname(fddfolder, path, sizeof(fddfolder));
+			sysmng_update(SYS_UPDATEOSCFG);
 			diskdrv_setfdd(drv, path, 0);
 		}
+#else
+		if (selectfile(&fddprm, path, NELEMENTS(path), defpath, drv)) {
+			diskdrv_setfdd(drv, path, 0);
+		}
+#endif
 	}
 }
 
@@ -526,12 +541,19 @@ const FSELPRM	*prm;
 		}
 	}
 #endif
-#if defined(__LIBRETRO__) || defined(EMSCRIPTEN)
-	if ((prm) && (selectfile(prm, path, NELEMENTS(path), p,drv+0xff))) {
-#else
+#if !defined(__LIBRETRO__) && !defined(EMSCRIPTEN)
+	if ((!p || !p[0]) && hddfolder[0]) {
+		p = hddfolder;
+	}
 	if ((prm) && (selectfile(prm, path, NELEMENTS(path), p))) {
-#endif
+		file_cpyname(hddfolder, path, sizeof(hddfolder));
+		sysmng_update(SYS_UPDATEOSCFG);
 		diskdrv_setsxsi(drv, path);
 	}
+#else
+	if ((prm) && (selectfile(prm, path, NELEMENTS(path), p, drv+0xff))) {
+		diskdrv_setsxsi(drv, path);
+	}
+#endif
 }
 
