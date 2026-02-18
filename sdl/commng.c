@@ -166,10 +166,7 @@ commng_create(UINT device, BOOL onReset)
 		} else if (cfg->port == COMPORT_MIDI) {
 			if(onReset) return NULL;
 #if !defined(EMSCRIPTEN)
-			fprintf(stderr, "MIDI: cmmidi_create(dev=%u, mout='%s', min='%s', mdl='%s')\n",
-				device, cfg->mout, cfg->min, cfg->mdl);
 			ret = cmmidi_create(device, cfg->mout, cfg->min, cfg->mdl);
-			fprintf(stderr, "MIDI: cmmidi_create returned %p\n", (void*)ret);
 #endif
 			if (ret) {
 				(*ret->msg)(ret, COMMSG_MIMPIDEFFILE, (INTPTR)cfg->def);
