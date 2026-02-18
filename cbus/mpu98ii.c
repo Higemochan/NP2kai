@@ -236,6 +236,24 @@ static void sendmpureset(void) {
 static void mpu98ii_int(void) {
 
 	TRACEOUT(("int!"));
+	// Ensure MPU-98II IRQ is unmasked in PIC (simulates BIOS/driver IRQ setup)
+	{
+		UINT8 irq = mpu98.irqnum;
+		UINT8 bit = 1 << (irq & 7);
+		if (irq < 8) {
+			if (pic.pi[0].imr & bit) {
+				pic.pi[0].imr &= ~bit;
+				fprintf(stderr, "MPU98 int! unmasked irq=%u in PIC master IMR (new imr=0x%02X)\n",
+					irq, pic.pi[0].imr);
+			}
+		} else {
+			if (pic.pi[1].imr & bit) {
+				pic.pi[1].imr &= ~bit;
+				fprintf(stderr, "MPU98 int! unmasked irq=%u in PIC slave IMR (new imr=0x%02X)\n",
+					irq, pic.pi[1].imr);
+			}
+		}
+	}
 	pic_setirq(mpu98.irqnum);
 	//// Sound Blaster 16
 	//if(g_nSoundID == SOUNDID_SB16 || g_nSoundID == SOUNDID_PC_9801_86_SB16 || g_nSoundID == SOUNDID_WSS_SB16 || g_nSoundID == SOUNDID_PC_9801_86_WSS_SB16 || g_nSoundID == SOUNDID_PC_9801_118_SB16 || g_nSoundID == SOUNDID_PC_9801_86_118_SB16){
@@ -1020,6 +1038,8 @@ TRACEOUT(("mpu98ii out %.4x %.2x", port, dat));
 
 void IOOUTCALL mpu98ii_o2(UINT port, REG8 dat) {
 
+	fprintf(stderr, "MPU98 cmd write port=0x%04X data=0x%02X mode=%d connect=%d\n",
+		port, dat, mpu98.mode, cm_mpu98 ? cm_mpu98->connect : -1);
 TRACEOUT(("mpu98ii out %.4x %.2x", port, dat));
 	if (cm_mpu98 == NULL) {
 		cm_mpu98 = commng_create(COMCREATE_MPU98II, FALSE);
@@ -1030,8 +1050,20 @@ TRACEOUT(("mpu98ii out %.4x %.2x", port, dat));
 //			TRACEOUT(("send cmd->%.2x", dat));
 			mpu98.cmd.cmd = dat;
 			phase = (*mpucmds[dat])(dat);
+			fprintf(stderr, "MPU98 cmd 0x%02X phase=0x%02X, rcnt=%d\n",
+				dat, phase, mpu98.r.cnt);
 			setrecvdata(MPUMSG_ACK);
-			mpu98ii_int();
+			fprintf(stderr, "MPU98 after setrecvdata rcnt=%d\n", mpu98.r.cnt);
+			if (dat == 0xff || dat == 0x3f) {
+				// RESET/UART: ACK available for polling, no IRQ, no BUSY
+				// Win3.1 386Enh vsbd.386 can't dispatch MPU-98II IRQ properly
+				mpu98.status &= ~MIDIOUT_BUSY;
+				fprintf(stderr, "MPU98 RESET/UART(0x%02X): ACK ready for polling, status=0x%02X\n",
+					dat, mpu98.status);
+			} else {
+				mpu98ii_int();
+				midicmdwait(pccore.realclock / 10000);
+			}
 			if (phase & MPUCMDP_REQ) {
 				phase &= ~MPUCMDP_REQ;
 				reqmpucmdgroupd(dat);
@@ -1039,21 +1071,29 @@ TRACEOUT(("mpu98ii out %.4x %.2x", port, dat));
 			mpu98.cmd.phase = phase;
 		}
 		else {
+			fprintf(stderr, "MPU98 UART mode, dat=0x%02X\n", dat);
 			if (dat == 0xff) {
 				mpu98.mode = 0;
 				setrecvdata(MPUMSG_ACK);
+				mpu98.status &= ~MIDIOUT_BUSY;
+			}
+			else {
+				midicmdwait(pccore.realclock / 10000);
 			}
 		}
-		midicmdwait(pccore.realclock / 10000);
+	} else {
+		fprintf(stderr, "MPU98 cmd IGNORED (connect OFF)\n");
 	}
 	(void)port;
 }
 
 REG8 IOINPCALL mpu98ii_i0(UINT port) {
-	
+
 	if (cm_mpu98 == NULL) {
 		cm_mpu98 = commng_create(COMCREATE_MPU98II, FALSE);
 	}
+	fprintf(stderr, "MPU98 data read port=0x%04X rcnt=%d data=0x%02X\n",
+		port, mpu98.r.cnt, mpu98.data);
 	if (cm_mpu98->connect != COMCONNECT_OFF) {
 		if (mpu98.r.cnt) {
 			mpu98.r.cnt--;
@@ -1093,9 +1133,24 @@ TRACEOUT(("mpu98ii inp %.4x %.2x", port, mpu98.data));
 REG8 IOINPCALL mpu98ii_i2(UINT port) {
 
 	REG8	ret;
-	
+
 	if (cm_mpu98 == NULL) {
 		cm_mpu98 = commng_create(COMCREATE_MPU98II, FALSE);
+	}
+	{
+		static int s_cnt = 0;
+		static REG8 s_last = 0xFF;
+		REG8 preview = mpu98.status;
+		if ((mpu98.r.cnt == 0) && (mpu98.intreq == 0)) preview |= 0x80;
+		if (preview != s_last || s_cnt >= 50) {
+			if (s_cnt > 1) fprintf(stderr, "  (repeated %d times)\n", s_cnt);
+			fprintf(stderr, "MPU98 status read port=0x%04X connect=%d ret=0x%02X rcnt=%d intreq=0x%02X\n",
+				port, cm_mpu98 ? cm_mpu98->connect : -1, preview, mpu98.r.cnt, mpu98.intreq);
+			s_last = preview;
+			s_cnt = 1;
+		} else {
+			s_cnt++;
+		}
 	}
 	if (cm_mpu98->connect != COMCONNECT_OFF || port == (cs4231.port[10] + 1) || (port & 0xff00) == 0x8100) {
 		ret = mpu98.status;
@@ -1162,8 +1217,8 @@ void mpu98ii_bind(void) {
 		port = mpu98.port;
 		iocore_attachout(port, mpu98ii_o0);
 		iocore_attachinp(port, mpu98ii_i0);
-		//iocore_attachout(port+1, mpu98ii_o2);
-		//iocore_attachinp(port+1, mpu98ii_i2);
+		iocore_attachout(port+1, mpu98ii_o2);  // IBM PC style base+1 (for vsbd.386 compat)
+		iocore_attachinp(port+1, mpu98ii_i2);
 		//iocore_attachout(port+0x100, mpu98ii_o2);
 		//iocore_attachinp(port+0x100, mpu98ii_i2);
 		port |= 2;

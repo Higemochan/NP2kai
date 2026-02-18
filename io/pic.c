@@ -204,9 +204,17 @@ void pic_irq(void) {												// ver0.78
 		}
 //		TRACEOUT(("hardware-int %.2x [%.4x:%.4x]", (p->pi[0].icw[1] & 0xf8) | num, CPU_CS, CPU_IP));
 		intrtmp = (p->pi[0].icw[1] & 0xf8) | num;
+		if (num == 3 || num == 6) {
+			fprintf(stderr, "PIC delivering IRQ%d → INT 0x%02X (CS:IP=%04X:%04X)\n",
+				num, intrtmp, CPU_CS, CPU_IP);
+		}
 		pic_leave_criticalsection();
 		CPU_INTERRUPT((REG8)intrtmp, 0);
 	}else{
+		if (num == 3 || num == 6) {
+			fprintf(stderr, "PIC IRQ%d blocked by ISR (isr=0x%02X bit=0x%02X)\n",
+				num, p->pi[0].isr, bit);
+		}
 		pic_leave_criticalsection();
 	}
 }

@@ -335,7 +335,13 @@ soundmng_create(UINT rate, UINT bufmsec)
 
 #if defined(VERMOUTH_LIB)
 	vermouth_module = midimod_create(rate);
-	midimod_loadall(vermouth_module);
+	if (vermouth_module == NULL) {
+		fprintf(stderr, "VERMOUTH: midimod_create FAILED (timidity.cfg not found?)\n");
+	} else {
+		fprintf(stderr, "VERMOUTH: midimod_create OK\n");
+		midimod_loadall(vermouth_module);
+		fprintf(stderr, "VERMOUTH: midimod_loadall done\n");
+	}
 #endif
 
 	soundmng_setreverse(FALSE);
