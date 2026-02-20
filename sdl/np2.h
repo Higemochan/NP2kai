@@ -30,6 +30,7 @@ enum {
 
 extern char hddfolder[MAX_PATH];
 extern char fddfolder[MAX_PATH];
+extern char cdfolder[MAX_PATH];
 extern char bmpfilefolder[MAX_PATH];
 extern UINT bmpfilenumber;
 extern char modulefile[MAX_PATH];

@@ -598,6 +598,7 @@ enum {
 static const INITBL iniitem[] = {
 	{OEMTEXT("FDfolder"), INITYPE_STR,	fddfolder,		MAX_PATH},
 	{OEMTEXT("HDfolder"), INITYPE_STR,	hddfolder,		MAX_PATH},
+	{OEMTEXT("CDfolder"), INITYPE_STR,	cdfolder,		MAX_PATH},
 	{OEMTEXT("bmap_Dir"), INITYPE_STR,	bmpfilefolder,		MAX_PATH},
 	{OEMTEXT("bmap_Num"), INITYPE_UINT32,	&bmpfilenumber,		0},
 	{OEMTEXT("fontfile"), INITYPE_STR,	np2cfg.fontfile,	MAX_PATH},

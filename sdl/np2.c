@@ -123,6 +123,7 @@ int s98log_count = 0;
 
 char hddfolder[MAX_PATH];
 char fddfolder[MAX_PATH];
+char cdfolder[MAX_PATH];
 char bmpfilefolder[MAX_PATH];
 UINT bmpfilenumber;
 char modulefile[MAX_PATH];

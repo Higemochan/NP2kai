@@ -14,6 +14,7 @@
 #if !defined(__LIBRETRO__)
 extern char fddfolder[MAX_PATH];
 extern char hddfolder[MAX_PATH];
+extern char cdfolder[MAX_PATH];
 #endif
 
 #ifdef SUPPORT_NVL_IMAGES
@@ -542,13 +543,24 @@ const FSELPRM	*prm;
 	}
 #endif
 #if !defined(__LIBRETRO__) && !defined(EMSCRIPTEN)
-	if ((!p || !p[0]) && hddfolder[0]) {
-		p = hddfolder;
-	}
-	if ((prm) && (selectfile(prm, path, NELEMENTS(path), p))) {
-		file_cpyname(hddfolder, path, sizeof(hddfolder));
-		sysmng_update(SYS_UPDATEOSCFG);
-		diskdrv_setsxsi(drv, path);
+	if (!(drv & 0x20) && num == 2) {
+		if ((!p || !p[0]) && cdfolder[0]) {
+			p = cdfolder;
+		}
+		if ((prm) && (selectfile(prm, path, NELEMENTS(path), p))) {
+			file_cpyname(cdfolder, path, sizeof(cdfolder));
+			sysmng_update(SYS_UPDATEOSCFG);
+			diskdrv_setsxsi(drv, path);
+		}
+	} else {
+		if ((!p || !p[0]) && hddfolder[0]) {
+			p = hddfolder;
+		}
+		if ((prm) && (selectfile(prm, path, NELEMENTS(path), p))) {
+			file_cpyname(hddfolder, path, sizeof(hddfolder));
+			sysmng_update(SYS_UPDATEOSCFG);
+			diskdrv_setsxsi(drv, path);
+		}
 	}
 #else
 	if ((prm) && (selectfile(prm, path, NELEMENTS(path), p, drv+0xff))) {
