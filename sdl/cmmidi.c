@@ -82,6 +82,10 @@ static int gettimeofday(struct timeval *tv, struct timezone *tz)
 }
 #endif
 
+#if defined(__APPLE__)
+#include <CoreMIDI/CoreMIDI.h>
+#endif
+
 #include "sound/vermouth/vermouth.h"
 
 #if defined(VERMOUTH_LIB)
@@ -145,6 +149,9 @@ enum {
 	CMMIDI_MIDIIN		= 0x02,
 	CMMIDI_MIDIINSTART	= 0x04,
 	CMMIDI_VERMOUTH		= 0x08,
+#if defined(__APPLE__)
+	CMMIDI_COREMIDI		= 0x10,
+#endif
 
 	MIDICTRL_READY		= 0,
 	MIDICTRL_2BYTES,
@@ -196,6 +203,12 @@ struct _cmmidi {
 #if defined(VAEG_FIX)
 	BYTE		rsflag;		// RS-232C bit5..RTS bit1..DTR
 							// ToDo: STATSAVEで保存するべき
+#endif
+
+#if defined(__APPLE__)
+	MIDIClientRef		coremidi_client;
+	MIDIPortRef		coremidi_port;
+	MIDIEndpointRef		coremidi_dest;
 #endif
 };
 
@@ -425,6 +438,85 @@ midiout_device(CMMIDI midi, UINT32 msg, UINT cnt)
 	midi_write(midi, buf, cnt);
 }
 
+#if defined(__APPLE__)
+static void
+midiout_coremidi(CMMIDI midi, UINT32 msg, UINT cnt)
+{
+	UINT8 buf[3];
+	UINT i;
+	MIDIPacketList pktList;
+	MIDIPacket *pkt;
+
+	for (i = 0; i < cnt; i++, msg >>= 8) {
+		buf[i] = msg & 0xff;
+	}
+	pkt = MIDIPacketListInit(&pktList);
+	pkt = MIDIPacketListAdd(&pktList, sizeof(pktList), pkt, 0, cnt, buf);
+	if (pkt) {
+		MIDISend(midi->coremidi_port, midi->coremidi_dest, &pktList);
+	}
+}
+
+static void
+sendexclusive_coremidi(CMMIDI midi, const UINT8 *buf, UINT leng)
+{
+	Byte pktBuf[sizeof(MIDIPacketList) + MIDI_BUFFER + 256];
+	MIDIPacketList *pktList = (MIDIPacketList *)pktBuf;
+	MIDIPacket *pkt;
+
+	if (leng > MIDI_BUFFER) {
+		return;
+	}
+	pkt = MIDIPacketListInit(pktList);
+	pkt = MIDIPacketListAdd(pktList, sizeof(pktBuf), pkt, 0, leng, buf);
+	if (pkt) {
+		MIDISend(midi->coremidi_port, midi->coremidi_dest, pktList);
+	}
+}
+
+static int
+coremidi_open(MIDIClientRef *client, MIDIPortRef *port, MIDIEndpointRef *dest)
+{
+	OSStatus err;
+	ItemCount n;
+
+	*client = 0;
+	*port = 0;
+	*dest = 0;
+
+	n = MIDIGetNumberOfDestinations();
+	if (n == 0) {
+		return -1;
+	}
+
+	err = MIDIClientCreate(CFSTR("np2kai"), NULL, NULL, client);
+	if (err != noErr) {
+		return -1;
+	}
+
+	err = MIDIOutputPortCreate(*client, CFSTR("np2kai MIDI Out"), port);
+	if (err != noErr) {
+		MIDIClientDispose(*client);
+		*client = 0;
+		return -1;
+	}
+
+	*dest = MIDIGetDestination(0);
+	return 0;
+}
+
+static void
+coremidi_close(CMMIDI midi)
+{
+	if (midi->coremidi_client) {
+		MIDIClientDispose(midi->coremidi_client);
+		midi->coremidi_client = 0;
+		midi->coremidi_port = 0;
+		midi->coremidi_dest = 0;
+	}
+}
+#endif
+
 #if defined(VERMOUTH_LIB)
 static void
 midiout_vermouth(CMMIDI midi, UINT32 msg, UINT cnt)
@@ -503,6 +595,11 @@ midireset(CMMIDI midi)
 			waitlastexclusiveout(midi);
 			sendexclusive(midi, excv, excvsize);
 		}
+#if defined(__APPLE__)
+		else if (midi->opened & CMMIDI_COREMIDI) {
+			sendexclusive_coremidi(midi, excv, excvsize);
+		}
+#endif
 #if defined(VERMOUTH_LIB)
 		else if (midi->opened & CMMIDI_VERMOUTH) {
 			midiout_longmsg(midi->vermouth, excv, excvsize);
@@ -721,6 +818,11 @@ midiwrite(COMMNG self, UINT8 data)
 				waitlastexclusiveout(midi);
 				sendexclusive(midi, midi->buffer, midi->mpos);
 			}
+#if defined(__APPLE__)
+			else if (midi->opened & CMMIDI_COREMIDI) {
+				sendexclusive_coremidi(midi, midi->buffer, midi->mpos);
+			}
+#endif
 #if defined(VERMOUTH_LIB)
 			else if (midi->opened & CMMIDI_VERMOUTH) {
 				midiout_longmsg(midi->vermouth, midi->buffer, midi->mpos);
@@ -816,6 +918,11 @@ midirelease(COMMNG self)
 		waitlastexclusiveout(midi);
 		close(midi->hmidiout);
 	}
+#if defined(__APPLE__)
+	if (midi->opened & CMMIDI_COREMIDI) {
+		coremidi_close(midi);
+	}
+#endif
 #if defined(VERMOUTH_LIB)
 	if (midi->opened & CMMIDI_VERMOUTH) {
 		midiout_destroy(midi->vermouth);
@@ -845,6 +952,11 @@ cmmidi_create(const UINT device, const char *midiout, const char *midiin, const 
 	COMMNG ret;
 	CMMIDI midi;
 	void (*outfn)(CMMIDI midi, UINT32 msg, UINT cnt);
+#if defined(__APPLE__)
+	MIDIClientRef cm_client = 0;
+	MIDIPortRef cm_port = 0;
+	MIDIEndpointRef cm_dest = 0;
+#endif
 #if defined(_WIN32) && !defined(__LIBRETRO__)
 	HMIDIOUT hmidiout;
 	HMIDIIN  hmidiin;
@@ -878,6 +990,14 @@ cmmidi_create(const UINT device, const char *midiout, const char *midiin, const 
 		outfn = midiout_device;
 		opened |= CMMIDI_MIDIOUT;
 	}
+#if defined(__APPLE__)
+	else if (!milstr_cmp(midiout, cmmidi_midiout_device)) {
+		if (coremidi_open(&cm_client, &cm_port, &cm_dest) == 0) {
+			outfn = midiout_coremidi;
+			opened |= CMMIDI_COREMIDI;
+		}
+	}
+#endif
 #if defined(VERMOUTH_LIB)
 	else if (!milstr_cmp(midiout, cmmidi_vermouth)) {
 		vermouth = midiout_create(vermouth_module, 512);
@@ -910,6 +1030,13 @@ cmmidi_create(const UINT device, const char *midiout, const char *midiin, const 
 	if (opened & CMMIDI_MIDIOUT) {
 		gettimeofday(&midi->hmidiout_nextstart, NULL);
 	}
+#if defined(__APPLE__)
+	if (opened & CMMIDI_COREMIDI) {
+		midi->coremidi_client = cm_client;
+		midi->coremidi_port = cm_port;
+		midi->coremidi_dest = cm_dest;
+	}
+#endif
 #if defined(VERMOUTH_LIB)
 	midi->vermouth = vermouth;
 	if (opened & CMMIDI_VERMOUTH) {
@@ -942,6 +1069,13 @@ cmcre_err2:
 #endif
 		}
 	}
+#if defined(__APPLE__)
+	if (opened & CMMIDI_COREMIDI) {
+		if (cm_client) {
+			MIDIClientDispose(cm_client);
+		}
+	}
+#endif
 #if defined(VERMOUTH_LIB)
 	if (opened & CMMIDI_VERMOUTH) {
 		midiout_destroy(vermouth);

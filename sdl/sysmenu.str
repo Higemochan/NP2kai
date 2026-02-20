@@ -512,7 +512,7 @@ static const MSYSITEM s_device[] = {
 		{NULL,				NULL,		MID_STATIC,			MENU_SEPARATOR},
 		{str_seropt,		NULL,		MID_SERIAL1,		MENU_GRAY},
 		{NULL,				NULL,		MID_STATIC,			MENU_SEPARATOR},
-		{str_midiopt,		NULL,		MID_MPUPC98,		MENU_GRAY},
+		{str_midiopt,		NULL,		MID_MPUPC98,		0},
 		{str_midipanic,		NULL,		MID_MIDIPANIC,		0},
 		{NULL,				NULL,		MID_STATIC,			MENU_SEPARATOR},
 #if defined(SUPPORT_FMGEN)

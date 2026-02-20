@@ -30,6 +30,7 @@
 #include	<embed/menu/dlgcfg.h>
 #include	<embed/menu/dlgscr.h>
 #include	<embed/menu/dlgwab.h>
+#include	<embed/menu/dlgmidi.h>
 #include	<embed/menu/dlgabout.h>
 #if defined(SUPPORT_VIDEOFILTER)
 #include	<vram/videofilter.h>
@@ -807,6 +808,11 @@ static void sys_cmd(MENUID id) {
 			winuileave();
 			break;
 #endif
+		case MID_MPUPC98:
+			menudlg_create(DLGMIDI_WIDTH, DLGMIDI_HEIGHT,
+											(char *)mstr_midiopt, dlgmidi_cmd);
+			break;
+
 		case MID_MIDIPANIC:
 			rs232c_midipanic();
 			mpu98ii_midipanic();
