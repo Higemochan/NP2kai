@@ -1164,7 +1164,7 @@ void mpu98ii_reset(const NP2CFG *pConfig) {
 	mpu98.irqnum = mpuirqnum[pConfig->mpuopt & 3];
 	setdefaultcondition();
 //	pic_registext(mpu98.irqnum);
-	
+
 	if (cm_mpu98 == NULL) {
 		cm_mpu98 = commng_create(COMCREATE_MPU98II, TRUE);
 	}

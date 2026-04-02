@@ -500,7 +500,7 @@ static void TTFGetFont1(FNTMNG _this, FNTDAT fdat, UINT16 c)
 #if USE_SDL_VERSION >= 3
 			TTF_GetGlyphMetrics(_this->ttf_font,s,&minx,NULL,NULL,&maxy,&advance);
 #else
-			TTF_GlyphMetrics(_this->ttf_font,s,&minx,NULL,NULL,&maxy,&advance);
+			TTF_GlyphMetrics(_this->ttf_font,c,&minx,NULL,NULL,&maxy,&advance);
 #endif
 #endif
 			for (y = 0; y < fdat->height; y++)
@@ -534,7 +534,7 @@ static void TTFGetFont1(FNTMNG _this, FNTDAT fdat, UINT16 c)
 #if USE_SDL_VERSION >= 3
 			TTF_GetGlyphMetrics(_this->ttf_font,s,&minx,NULL,NULL,&maxy,&advance);
 #else
-			TTF_GlyphMetrics(_this->ttf_font,s,&minx,NULL,NULL,&maxy,&advance);
+			TTF_GlyphMetrics(_this->ttf_font,c,&minx,NULL,NULL,&maxy,&advance);
 #endif
 #endif
 			for (y = 0; y < fdat->height; y++)
